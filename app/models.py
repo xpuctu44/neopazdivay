@@ -60,3 +60,14 @@ class TimeEntry(Base):
     user = relationship("User", back_populates="time_entries")
     project = relationship("Project", back_populates="time_entries")
 
+
+class Attendance(Base):
+    __tablename__ = "attendance"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    started_at = Column(DateTime, nullable=False)
+    ended_at = Column(DateTime, nullable=True)
+    work_date = Column(Date, nullable=False)
+    hours = Column(Float, nullable=True)
+

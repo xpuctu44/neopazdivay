@@ -67,3 +67,51 @@ def register_user(
 
     return RedirectResponse(url="/register?success=1", status_code=status.HTTP_303_SEE_OTHER)
 
+
+@router.get("/login", include_in_schema=False)
+def login_page(request: Request):
+    return templates.TemplateResponse(
+        "login.html",
+        {
+            "request": request,
+            "title": "Вход",
+            "error": None,
+        },
+    )
+
+
+@router.post("/login", include_in_schema=False)
+def login(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        return templates.TemplateResponse(
+            "login.html",
+            {"request": request, "title": "Вход", "error": "Неверная почта или пароль"},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    # Password verification is optional for now since we do not import verify
+    # For correctness, use security.verify_password
+    from app.security import verify_password
+
+    if not verify_password(password, user.hashed_password):
+        return templates.TemplateResponse(
+            "login.html",
+            {"request": request, "title": "Вход", "error": "Неверная почта или пароль"},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    request.session["user_id"] = user.id
+    request.session["role"] = user.role
+    return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/logout", include_in_schema=False)
+def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
