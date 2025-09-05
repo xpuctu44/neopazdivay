@@ -83,7 +83,39 @@
           </div>
         {% elif active_tab=='reports' %}
           <h2>Отчеты</h2>
-          <p>Здесь отчеты по отработанным часам и проектам.</p>
+          <form method="get" action="/admin/reports" style="margin:8px 0;display:flex;gap:8px;align-items:center">
+            <label>Год <input type="number" min="2000" max="2100" name="year" value="{{ year or '' }}" style="width:110px"></label>
+            <label>Месяц <input type="number" min="1" max="12" name="month" value="{{ month or '' }}" style="width:80px"></label>
+            <button type="submit">Показать</button>
+          </form>
+          {% if report_rows is defined %}
+          <div style="overflow:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Сотрудник</th>
+                  <th>Рабочие часы</th>
+                  <th>Отгулы</th>
+                  <th>Больничные</th>
+                  <th>Отпуска</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in report_rows %}
+                  <tr>
+                    <td style="white-space:nowrap">{{ row.emp.full_name or row.emp.email }}</td>
+                    <td>{{ row.hours }}</td>
+                    <td>{{ row.off }}</td>
+                    <td>{{ row.sick }}</td>
+                    <td>{{ row.vacation }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+            <p style="color:#98a2b3">Выберите год и месяц для отчета.</p>
+          {% endif %}
         {% elif active_tab=='users' %}
           <h2>Сотрудники</h2>
           <p>Здесь управление пользователями.</p>

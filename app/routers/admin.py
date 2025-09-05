@@ -226,13 +226,76 @@ def admin_planning_publish(
 
 
 @router.get("/admin/reports", include_in_schema=False)
-def admin_reports(request: Request, db: Session = Depends(get_db)):
+def admin_reports(request: Request, db: Session = Depends(get_db), year: int | None = None, month: int | None = None):
     result = _ensure_admin(request, db)
     if isinstance(result, RedirectResponse):
         return result
+
+    today = date.today()
+    y = year or today.year
+    m = month or today.month
+    days_in_month = calendar.monthrange(y, m)[1]
+    first_day = date(y, m, 1)
+    last_day = date(y, m, days_in_month)
+
+    employees = db.query(User).filter(User.role == "employee", User.is_active == True).order_by(User.full_name.nulls_last()).all()
+
+    # Aggregate actual worked hours from Attendance
+    from app.models import Attendance, ScheduleEntry
+
+    hours_by_user = {}
+    attendance = (
+        db.query(Attendance)
+        .filter(Attendance.work_date >= first_day, Attendance.work_date <= last_day)
+        .all()
+    )
+    for a in attendance:
+        if a.hours is None:
+            continue
+        hours_by_user[a.user_id] = hours_by_user.get(a.user_id, 0.0) + float(a.hours)
+
+    # Aggregate counts from published schedules (off/vacation/sick)
+    entries = (
+        db.query(ScheduleEntry)
+        .filter(
+            ScheduleEntry.work_date >= first_day,
+            ScheduleEntry.work_date <= last_day,
+            ScheduleEntry.published == True,
+            ScheduleEntry.shift_type.in_(["off", "vacation", "sick"]),
+        )
+        .all()
+    )
+    off_by_user = {}
+    sick_by_user = {}
+    vac_by_user = {}
+    for e in entries:
+        if e.shift_type == "off":
+            off_by_user[e.user_id] = off_by_user.get(e.user_id, 0) + 1
+        elif e.shift_type == "sick":
+            sick_by_user[e.user_id] = sick_by_user.get(e.user_id, 0) + 1
+        elif e.shift_type == "vacation":
+            vac_by_user[e.user_id] = vac_by_user.get(e.user_id, 0) + 1
+
+    rows = []
+    for emp in employees:
+        rows.append({
+            "emp": emp,
+            "hours": round(hours_by_user.get(emp.id, 0.0), 2),
+            "off": off_by_user.get(emp.id, 0),
+            "sick": sick_by_user.get(emp.id, 0),
+            "vacation": vac_by_user.get(emp.id, 0),
+        })
+
     return templates.TemplateResponse(
         "admin.html",
-        {"request": request, "title": "Админ — отчеты", "active_tab": "reports"},
+        {
+            "request": request,
+            "title": "Админ — отчеты",
+            "active_tab": "reports",
+            "year": y,
+            "month": m,
+            "report_rows": rows,
+        },
     )
 
 
