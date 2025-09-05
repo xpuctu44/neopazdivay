@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title or "Админ" }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/styles.css') }}" />
+    <style>
+      .tabs{display:flex;gap:12px;margin:16px 0}
+      .tab{padding:8px 12px;border-radius:8px;background:#1a2238;color:#e8eef5}
+      .tab.active{background:#6ea8fe;color:#04142b}
+      .panel{background:#151b2d;border:1px solid #223;padding:16px;border-radius:10px}
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Администрирование</h1>
+    </header>
+    <main>
+      <nav class="tabs">
+        <a class="tab {{ 'active' if active_tab=='schedule' else '' }}" href="/admin/schedule">График</a>
+        <a class="tab {{ 'active' if active_tab=='planning' else '' }}" href="/admin/planning">Планирование</a>
+        <a class="tab {{ 'active' if active_tab=='reports' else '' }}" href="/admin/reports">Отчеты</a>
+        <a class="tab {{ 'active' if active_tab=='users' else '' }}" href="/admin/users">Сотрудники</a>
+      </nav>
+
+      <section class="panel">
+        {% if active_tab=='schedule' %}
+          <h2>График</h2>
+          <p>Здесь будет календарь смен и графики.</p>
+        {% elif active_tab=='planning' %}
+          <h2>Планирование</h2>
+          <p>Здесь планирование смен и задач.</p>
+        {% elif active_tab=='reports' %}
+          <h2>Отчеты</h2>
+          <p>Здесь отчеты по отработанным часам и проектам.</p>
+        {% elif active_tab=='users' %}
+          <h2>Сотрудники</h2>
+          <p>Здесь управление пользователями.</p>
+        {% endif %}
+      </section>
+
+      <form method="post" action="/logout" style="margin-top:16px;">
+        <button type="submit" class="btn" style="background:#eee">Выйти</button>
+      </form>
+    </main>
+  </body>
+  </html>
+
