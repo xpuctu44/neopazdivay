@@ -14,6 +14,8 @@ class User(Base):
     full_name = Column(String(200), nullable=True)
     hashed_password = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    role = Column(String(20), nullable=False, default="employee")
+    date_of_birth = Column(Date, nullable=True)
 
     projects = relationship(
         "Project",
