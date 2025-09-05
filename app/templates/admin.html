@@ -25,12 +25,62 @@
       </nav>
 
       <section class="panel">
-        {% if active_tab=='schedule' %}
-          <h2>График</h2>
-          <p>Здесь будет календарь смен и графики.</p>
-        {% elif active_tab=='planning' %}
-          <h2>Планирование</h2>
-          <p>Здесь планирование смен и задач.</p>
+        {% if active_tab in ['schedule','planning'] %}
+          <h2>{{ 'График' if active_tab=='schedule' else 'Планирование' }}</h2>
+          {% if year and month %}
+            <p style="color:#98a2b3">{{ year }}-{{ '%02d'|format(month) }}</p>
+          {% endif %}
+          <div style="overflow:auto">
+            <form method="post" action="{{ '/admin/planning/save' if not readonly else '#' }}">
+              <input type="hidden" name="year" value="{{ year }}" />
+              <input type="hidden" name="month" value="{{ month }}" />
+              <table>
+                <thead>
+                  <tr>
+                    <th>Сотрудник</th>
+                    {% for d in days %}
+                      <th>{{ d }}</th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for emp in employees %}
+                  <tr>
+                    <td style="white-space:nowrap">{{ emp.full_name or emp.email }}</td>
+                    {% for d in days %}
+                    {% set key = (emp.id, d) %}
+                    {% set current = entry_map.get(key) %}
+                    <td>
+                      {% if readonly %}
+                        <span style="color:#e8eef5">{{ shift_labels.get(current, '') }}</span>
+                      {% else %}
+                        <select name="shift_{{ emp.id }}_{{ d }}">
+                          <option value=""></option>
+                          {% for code,label in shift_labels.items() %}
+                            <option value="{{ code }}" {{ 'selected' if current==code else '' }}>{{ label }}</option>
+                          {% endfor %}
+                        </select>
+                      {% endif %}
+                    </td>
+                    {% endfor %}
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              {% if not readonly %}
+                <div style="margin-top:12px;display:flex;gap:8px">
+                  <button type="submit">Сохранить</button>
+                </div>
+              {% endif %}
+            </form>
+            {% if not readonly %}
+              <form method="post" action="/admin/planning/publish" style="margin-top:8px">
+                <input type="hidden" name="year" value="{{ year }}" />
+                <input type="hidden" name="month" value="{{ month }}" />
+                <button type="submit" class="btn">Сохранить и опубликовать</button>
+              </form>
+            {% endif %}
+          </div>
         {% elif active_tab=='reports' %}
           <h2>Отчеты</h2>
           <p>Здесь отчеты по отработанным часам и проектам.</p>

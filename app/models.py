@@ -71,3 +71,13 @@ class Attendance(Base):
     work_date = Column(Date, nullable=False)
     hours = Column(Float, nullable=True)
 
+class ScheduleEntry(Base):
+    __tablename__ = "schedule_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    work_date = Column(Date, nullable=False)
+    shift_type = Column(String(20), nullable=False)  # work, off, vacation, sick, weekend
+    published = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+

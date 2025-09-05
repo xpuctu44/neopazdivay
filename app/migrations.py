@@ -42,3 +42,22 @@ def run_sqlite_migrations(engine: Engine) -> None:
                 )
             """))
 
+    # schedule_entries table
+    with engine.connect() as connection:
+        exists = connection.execute(text("""
+            SELECT name FROM sqlite_master WHERE type='table' AND name='schedule_entries'
+        """
+        )).fetchone()
+        if not exists:
+            connection.execute(text("""
+                CREATE TABLE schedule_entries (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    work_date DATE NOT NULL,
+                    shift_type VARCHAR(20) NOT NULL,
+                    published BOOLEAN NOT NULL DEFAULT 0,
+                    created_at DATETIME NOT NULL,
+                    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            """))
+
