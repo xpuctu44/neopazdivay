@@ -38,16 +38,28 @@
           </label>
           <label>
             Роль
-            <select name="role">
+            <select name="role" id="roleSelect" onchange="toggleAdminSecret()">
               <option value="employee">Сотрудник</option>
               <option value="admin">Администратор</option>
             </select>
+          </label>
+          <label id="adminSecretBlock" style="display:none">
+            Секретный код для администратора
+            <input type="password" name="admin_secret" placeholder="Введите 20252025" />
           </label>
           <div>
             <button type="submit">Зарегистрироваться</button>
           </div>
         </div>
       </form>
+      <script>
+        function toggleAdminSecret(){
+          var role = document.getElementById('roleSelect').value;
+          var block = document.getElementById('adminSecretBlock');
+          block.style.display = role === 'admin' ? 'block' : 'none';
+        }
+        toggleAdminSecret();
+      </script>
     </main>
   </body>
   </html>

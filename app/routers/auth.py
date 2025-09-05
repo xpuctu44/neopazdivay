@@ -36,11 +36,26 @@ def register_user(
     full_name: str = Form(""),
     date_of_birth: date | None = Form(None),
     role: str = Form("employee"),
+    admin_secret: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     role_normalized = role.lower()
     if role_normalized not in ("admin", "employee"):
         role_normalized = "employee"
+
+    # Require secret code for admin registration
+    if role_normalized == "admin":
+        if not admin_secret or admin_secret != "20252025":
+            return templates.TemplateResponse(
+                "register.html",
+                {
+                    "request": request,
+                    "title": "Регистрация",
+                    "error": "Для регистрации администратора введите верный секретный код",
+                    "success": False,
+                },
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
     existing = db.query(User).filter(User.email == email).first()
     if existing:
