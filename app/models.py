@@ -16,6 +16,7 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     role = Column(String(20), nullable=False, default="employee")
     date_of_birth = Column(Date, nullable=True)
+    store_id = Column(Integer, ForeignKey("stores.id", ondelete="SET NULL"), nullable=True)
 
     projects = relationship(
         "Project",
@@ -28,6 +29,7 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    store = relationship("Store", back_populates="employees")
 
 
 class Project(Base):
@@ -80,4 +82,15 @@ class ScheduleEntry(Base):
     shift_type = Column(String(20), nullable=False)  # work, off, vacation, sick, weekend
     published = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class Store(Base):
+    __tablename__ = "stores"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), unique=True, nullable=False, index=True)
+    address = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    employees = relationship("User", back_populates="store")
 

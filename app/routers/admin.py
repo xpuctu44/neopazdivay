@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User, ScheduleEntry
+from app.models import User, ScheduleEntry, Store
 
 
 router = APIRouter()
@@ -51,7 +51,7 @@ def admin_root(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/admin/schedule", include_in_schema=False)
-def admin_schedule(request: Request, db: Session = Depends(get_db), year: int | None = None, month: int | None = None):
+def admin_schedule(request: Request, db: Session = Depends(get_db), year: int | None = None, month: int | None = None, store_id: int | None = None):
     result = _ensure_admin(request, db)
     if isinstance(result, RedirectResponse):
         return result
@@ -60,23 +60,11 @@ def admin_schedule(request: Request, db: Session = Depends(get_db), year: int | 
     m = month or today.month
     days_in_month = calendar.monthrange(y, m)[1]
     days = list(range(1, days_in_month + 1))
-    employees = db.query(User).filter(User.role == "employee", User.is_active == True).order_by(User.full_name.nulls_last()).all()
-
-    # Load published entries for the month
-    first_day = date(y, m, 1)
-    last_day = date(y, m, days_in_month)
-    entries = (
-        db.query(ScheduleEntry)
-        .filter(
-            ScheduleEntry.work_date >= first_day,
-            ScheduleEntry.work_date <= last_day,
-            ScheduleEntry.published == True,
-        )
-        .all()
-    )
-    entry_map: dict[tuple[int, int], str] = {}
-    for e in entries:
-        entry_map[(e.user_id, e.work_date.day)] = e.shift_type
+    q = db.query(User).filter(User.role == "employee", User.is_active == True)
+    if store_id:
+        q = q.filter(User.store_id == store_id)
+    employees = q.order_by(User.full_name.nulls_last()).all()
+    stores = db.query(Store).filter(Store.is_active == True).order_by(Store.name).all()
     return templates.TemplateResponse(
         "admin.html",
         {
@@ -96,12 +84,14 @@ def admin_schedule(request: Request, db: Session = Depends(get_db), year: int | 
                 "weekend": "Выходной",
             },
             "readonly": True,
+            "store_id": store_id,
+            "stores": stores,
         },
     )
 
 
 @router.get("/admin/planning", include_in_schema=False)
-def admin_planning(request: Request, db: Session = Depends(get_db), year: int | None = None, month: int | None = None):
+def admin_planning(request: Request, db: Session = Depends(get_db), year: int | None = None, month: int | None = None, store_id: int | None = None):
     result = _ensure_admin(request, db)
     if isinstance(result, RedirectResponse):
         return result
@@ -110,23 +100,11 @@ def admin_planning(request: Request, db: Session = Depends(get_db), year: int | 
     m = month or today.month
     days_in_month = calendar.monthrange(y, m)[1]
     days = list(range(1, days_in_month + 1))
-    employees = db.query(User).filter(User.role == "employee", User.is_active == True).order_by(User.full_name.nulls_last()).all()
-
-    # Load draft (unpublished) entries for the month
-    first_day = date(y, m, 1)
-    last_day = date(y, m, days_in_month)
-    entries = (
-        db.query(ScheduleEntry)
-        .filter(
-            ScheduleEntry.work_date >= first_day,
-            ScheduleEntry.work_date <= last_day,
-            ScheduleEntry.published == False,
-        )
-        .all()
-    )
-    entry_map: dict[tuple[int, int], str] = {}
-    for e in entries:
-        entry_map[(e.user_id, e.work_date.day)] = e.shift_type
+    q = db.query(User).filter(User.role == "employee", User.is_active == True)
+    if store_id:
+        q = q.filter(User.store_id == store_id)
+    employees = q.order_by(User.full_name.nulls_last()).all()
+    stores = db.query(Store).filter(Store.is_active == True).order_by(Store.name).all()
     return templates.TemplateResponse(
         "admin.html",
         {
@@ -146,6 +124,8 @@ def admin_planning(request: Request, db: Session = Depends(get_db), year: int | 
                 "weekend": "Выходной",
             },
             "readonly": False,
+            "store_id": store_id,
+            "stores": stores,
         },
     )
 
@@ -300,12 +280,79 @@ def admin_reports(request: Request, db: Session = Depends(get_db), year: int | N
 
 
 @router.get("/admin/users", include_in_schema=False)
-def admin_users(request: Request, db: Session = Depends(get_db)):
+def admin_users(request: Request, db: Session = Depends(get_db), store_id: int | None = None):
     result = _ensure_admin(request, db)
     if isinstance(result, RedirectResponse):
         return result
+    stores = db.query(Store).filter(Store.is_active == True).order_by(Store.name).all()
+    q = db.query(User).filter(User.role == "employee")
+    if store_id:
+        q = q.filter(User.store_id == store_id)
+    employees = q.order_by(User.full_name.nulls_last()).all()
     return templates.TemplateResponse(
         "admin.html",
-        {"request": request, "title": "Админ — сотрудники", "active_tab": "users"},
+        {
+            "request": request,
+            "title": "Админ — сотрудники",
+            "active_tab": "users",
+            "stores": stores,
+            "employees": employees,
+            "selected_store_id": store_id,
+        },
     )
+
+
+@router.post("/admin/users/assign_store", include_in_schema=False)
+async def admin_users_assign_store(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    result = _ensure_admin(request, db)
+    if isinstance(result, RedirectResponse):
+        return result
+    form = await request.form()
+    user_id = int(form.get("user_id"))
+    store_id = form.get("store_id")
+    store_id_int = int(store_id) if store_id else None
+    user = db.get(User, user_id)
+    if user:
+        user.store_id = store_id_int
+        db.add(user)
+        db.commit()
+    back = form.get("back") or "/admin/users"
+    return RedirectResponse(url=back, status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/admin/stores", include_in_schema=False)
+def admin_stores(request: Request, db: Session = Depends(get_db)):
+    result = _ensure_admin(request, db)
+    if isinstance(result, RedirectResponse):
+        return result
+    stores = db.query(Store).order_by(Store.is_active.desc(), Store.name).all()
+    return templates.TemplateResponse(
+        "admin.html",
+        {
+            "request": request,
+            "title": "Админ — магазины",
+            "active_tab": "stores",
+            "stores": stores,
+        },
+    )
+
+
+@router.post("/admin/stores/add", include_in_schema=False)
+async def admin_stores_add(request: Request, db: Session = Depends(get_db)):
+    result = _ensure_admin(request, db)
+    if isinstance(result, RedirectResponse):
+        return result
+    form = await request.form()
+    name = (form.get("name") or "").strip()
+    address = (form.get("address") or "").strip() or None
+    if name:
+        exists = db.query(Store).filter(Store.name == name).first()
+        if not exists:
+            store = Store(name=name, address=address)
+            db.add(store)
+            db.commit()
+    return RedirectResponse(url="/admin/stores", status_code=status.HTTP_303_SEE_OTHER)
 

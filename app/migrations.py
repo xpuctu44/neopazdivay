@@ -61,3 +61,25 @@ def run_sqlite_migrations(engine: Engine) -> None:
                 )
             """))
 
+    # stores table
+    with engine.connect() as connection:
+        exists = connection.execute(text("""
+            SELECT name FROM sqlite_master WHERE type='table' AND name='stores'
+        """)).fetchone()
+        if not exists:
+            connection.execute(text("""
+                CREATE TABLE stores (
+                    id INTEGER PRIMARY KEY,
+                    name VARCHAR(200) NOT NULL UNIQUE,
+                    address TEXT NULL,
+                    is_active BOOLEAN NOT NULL DEFAULT 1
+                )
+            """))
+
+    # users.store_id column
+    if not _column_exists(engine, "users", "store_id"):
+        with engine.connect() as connection:
+            connection.execute(
+                text("ALTER TABLE users ADD COLUMN store_id INTEGER NULL REFERENCES stores(id)")
+            )
+
