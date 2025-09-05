@@ -96,6 +96,25 @@
               </form>
             {% endif %}
           </div>
+          {% if not readonly %}
+          <script>
+            (function(){
+              var tbl = document.querySelector('table');
+              if(!tbl) return;
+              tbl.addEventListener('dblclick', function(ev){
+                var td = ev.target.closest('td');
+                if(!td) return;
+                var sel = td.querySelector('select[name^="shift_"]');
+                if(sel){
+                  sel.value = 'weekend';
+                  sel.dispatchEvent(new Event('change', { bubbles: true }));
+                  td.style.outline = '2px solid #6ea8fe';
+                  setTimeout(function(){ td.style.outline = ''; }, 400);
+                }
+              });
+            })();
+          </script>
+          {% endif %}
         {% elif active_tab=='reports' %}
           <h2>Отчеты</h2>
           <form method="get" action="/admin/reports" style="margin:8px 0;display:flex;gap:8px;align-items:center">
