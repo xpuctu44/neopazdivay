@@ -131,7 +131,7 @@ def admin_planning(request: Request, db: Session = Depends(get_db), year: int | 
 
 
 @router.post("/admin/planning/save", include_in_schema=False)
-def admin_planning_save(
+async def admin_planning_save(
     request: Request,
     db: Session = Depends(get_db),
     year: int = Form(...),
@@ -203,6 +203,92 @@ def admin_planning_publish(
     db.commit()
 
     return RedirectResponse(url=f"/admin/schedule?year={year}&month={month}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/admin/reports/shifts", include_in_schema=False)
+def admin_reports_shifts(
+    request: Request,
+    db: Session = Depends(get_db),
+    user_id: int | None = None,
+    year: int | None = None,
+    month: int | None = None,
+):
+    result = _ensure_admin(request, db)
+    if isinstance(result, RedirectResponse):
+        return result
+
+    from app.models import Attendance
+    today = date.today()
+    y = year or today.year
+    m = month or today.month
+    days_in_month = calendar.monthrange(y, m)[1]
+    first_day = date(y, m, 1)
+    last_day = date(y, m, days_in_month)
+
+    employees = db.query(User).filter(User.role == "employee").order_by(User.full_name.nulls_last()).all()
+    selected_user = db.get(User, user_id) if user_id else None
+    entries = []
+    if selected_user:
+        entries = (
+            db.query(Attendance)
+            .filter(
+                Attendance.user_id == selected_user.id,
+                Attendance.work_date >= first_day,
+                Attendance.work_date <= last_day,
+            )
+            .order_by(Attendance.work_date.asc(), Attendance.started_at.asc())
+            .all()
+        )
+
+    return templates.TemplateResponse(
+        "admin.html",
+        {
+            "request": request,
+            "title": "Админ — отчеты по сменам",
+            "active_tab": "reports_shifts",
+            "employees": employees,
+            "selected_user": selected_user,
+            "entries": entries,
+            "year": y,
+            "month": m,
+        },
+    )
+
+
+@router.post("/admin/reports/shifts/update", include_in_schema=False)
+async def admin_reports_shifts_update(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    result = _ensure_admin(request, db)
+    if isinstance(result, RedirectResponse):
+        return result
+
+    from app.models import Attendance
+    form = await request.form()
+    attendance_id = int(form.get("attendance_id"))
+    started_at_str = form.get("started_at")
+    ended_at_str = form.get("ended_at")
+    back = form.get("back") or "/admin/reports/shifts"
+
+    from datetime import datetime
+    started_at = datetime.fromisoformat(started_at_str) if started_at_str else None
+    ended_at = datetime.fromisoformat(ended_at_str) if ended_at_str else None
+
+    row = db.get(Attendance, attendance_id)
+    if row and started_at:
+        row.started_at = started_at
+        row.work_date = started_at.date()
+        row.ended_at = ended_at
+        if row.ended_at and row.started_at:
+            elapsed_seconds = (row.ended_at - row.started_at).total_seconds()
+            row.hours = round(max(elapsed_seconds, 0) / 3600.0, 4)
+        else:
+            row.hours = None
+        db.add(row)
+        db.commit()
+
+    return RedirectResponse(url=back, status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/admin/reports", include_in_schema=False)

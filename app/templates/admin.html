@@ -21,6 +21,7 @@
         <a class="tab {{ 'active' if active_tab=='schedule' else '' }}" href="/admin/schedule">График</a>
         <a class="tab {{ 'active' if active_tab=='planning' else '' }}" href="/admin/planning">Планирование</a>
         <a class="tab {{ 'active' if active_tab=='reports' else '' }}" href="/admin/reports">Отчеты</a>
+        <a class="tab {{ 'active' if active_tab=='reports_shifts' else '' }}" href="/admin/reports/shifts">Смены</a>
         <a class="tab {{ 'active' if active_tab=='users' else '' }}" href="/admin/users">Сотрудники</a>
         <a class="tab {{ 'active' if active_tab=='stores' else '' }}" href="/admin/stores">Магазины</a>
       </nav>
@@ -175,6 +176,59 @@
               </tbody>
             </table>
           </div>
+        {% endif %}
+
+        {% if active_tab=='reports_shifts' %}
+          <h2>Отчет по сменам</h2>
+          <form method="get" action="/admin/reports/shifts" style="margin:8px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <label>Сотрудник
+              <select name="user_id" style="min-width:220px">
+                <option value="">— выберите —</option>
+                {% for emp in employees or [] %}
+                  <option value="{{ emp.id }}" {{ 'selected' if selected_user and selected_user.id==emp.id else '' }}>{{ emp.full_name or emp.email }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>Год <input type="number" min="2000" max="2100" name="year" value="{{ year or '' }}" style="width:110px"></label>
+            <label>Месяц <input type="number" min="1" max="12" name="month" value="{{ month or '' }}" style="width:80px"></label>
+            <button type="submit">Показать</button>
+          </form>
+          {% if selected_user %}
+          <div style="overflow:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Дата</th>
+                  <th>Начало</th>
+                  <th>Окончание</th>
+                  <th>Часы</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for e in entries %}
+                <tr>
+                  <td>{{ e.work_date }}</td>
+                  <td>
+                    <form method="post" action="/admin/reports/shifts/update">
+                      <input type="hidden" name="attendance_id" value="{{ e.id }}" />
+                      <input type="hidden" name="back" value="/admin/reports/shifts?user_id={{ selected_user.id }}&year={{ year }}&month={{ month }}" />
+                      <input type="datetime-local" name="started_at" value="{{ (e.started_at.isoformat()[:16]) if e.started_at else '' }}" />
+                  </td>
+                  <td>
+                      <input type="datetime-local" name="ended_at" value="{{ (e.ended_at.isoformat()[:16]) if e.ended_at else '' }}" />
+                  </td>
+                  <td>{{ '%.2f'|format(e.hours or 0) }}</td>
+                  <td>
+                      <button type="submit">Сохранить</button>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% endif %}
         {% endif %}
 
         {% if active_tab=='stores' %}
