@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Проверка статуса Time Tracker</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .status-box {
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid;
+        }
+        .success {
+            background-color: #d4edda;
+            border-left-color: #28a745;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-left-color: #dc3545;
+            color: #721c24;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border-left-color: #ffc107;
+            color: #856404;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border-left-color: #17a2b8;
+            color: #0c5460;
+        }
+        .step {
+            background-color: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        .code {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            border: 1px solid #dee2e6;
+            margin: 10px 0;
+        }
+        .button {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 5px;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        .test-link {
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Проверка статуса Time Tracker</h1>
+        
+        <div class="test-link">
+            <a href="http://localhost:8000" class="button" target="_blank">
+                🚀 Открыть Time Tracker
+            </a>
+        </div>
+
+        <div class="status-box info">
+            <h3>📋 Инструкции по проверке:</h3>
+            <ol>
+                <li>Нажмите кнопку "Открыть Time Tracker" выше</li>
+                <li>Если сайт открылся - всё работает! ✅</li>
+                <li>Если не открылся - следуйте инструкциям ниже</li>
+            </ol>
+        </div>
+
+        <div class="status-box error">
+            <h3>❌ Если сайт не открывается:</h3>
+            
+            <div class="step">
+                <h4>Шаг 1: Проверьте, что сервер запущен</h4>
+                <p>Дважды кликните по файлу:</p>
+                <div class="code">start_time_tracker.bat</div>
+                <p>Или запустите PowerShell скрипт:</p>
+                <div class="code">start_time_tracker.ps1</div>
+            </div>
+
+            <div class="step">
+                <h4>Шаг 2: Проверьте Python</h4>
+                <p>Откройте командную строку и выполните:</p>
+                <div class="code">python --version</div>
+                <p>Должна показаться версия Python (например, Python 3.11.x)</p>
+            </div>
+
+            <div class="step">
+                <h4>Шаг 3: Установите зависимости вручную</h4>
+                <p>В командной строке выполните:</p>
+                <div class="code">
+                    python -m pip install fastapi uvicorn jinja2 sqlalchemy pydantic "passlib[bcrypt]" python-multipart
+                </div>
+            </div>
+
+            <div class="step">
+                <h4>Шаг 4: Запустите сервер вручную</h4>
+                <p>Перейдите в папку проекта и запустите:</p>
+                <div class="code">
+                    cd neopazdivay<br>
+                    python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+                </div>
+            </div>
+        </div>
+
+        <div class="status-box warning">
+            <h3>⚠️ Возможные проблемы:</h3>
+            <ul>
+                <li><strong>Порт 8000 занят:</strong> Закройте другие приложения или измените порт</li>
+                <li><strong>Python не найден:</strong> Установите Python с python.org</li>
+                <li><strong>Зависимости не установлены:</strong> Выполните pip install</li>
+                <li><strong>Брандмауэр блокирует:</strong> Разрешите подключения к порту 8000</li>
+            </ul>
+        </div>
+
+        <div class="status-box success">
+            <h3>✅ Если всё работает:</h3>
+            <p>Отлично! Теперь вы можете:</p>
+            <ul>
+                <li>Зарегистрировать администратора (секрет: <strong>20252025</strong>)</li>
+                <li>Создать аккаунты для сотрудников</li>
+                <li>Настроить систему под ваши потребности</li>
+            </ul>
+        </div>
+
+        <div class="status-box info">
+            <h3>📚 Дополнительная помощь:</h3>
+            <ul>
+                <li><a href="INSTRUCTIONS.html" target="_blank">📖 Подробная инструкция</a></li>
+                <li><a href="TROUBLESHOOTING.md" target="_blank">🔧 Руководство по устранению неполадок</a></li>
+                <li><a href="DEVELOPER_README.md" target="_blank">👨‍💻 Документация для разработчика</a></li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px; color: #6c757d;">
+            <p>Time Tracker - Система учета рабочего времени</p>
+            <p>Версия 1.0 | Создано с ❤️</p>
+        </div>
+    </div>
+
+    <script>
+        // Автоматическая проверка доступности сервера
+        function checkServer() {
+            fetch('http://localhost:8000/health')
+                .then(response => {
+                    if (response.ok) {
+                        document.querySelector('.test-link').innerHTML = 
+                            '<div class="status-box success"><h3>✅ Сервер работает!</h3><p>Time Tracker доступен по адресу <a href="http://localhost:8000" target="_blank">http://localhost:8000</a></p></div>';
+                    } else {
+                        throw new Error('Server not responding');
+                    }
+                })
+                .catch(error => {
+                    document.querySelector('.test-link').innerHTML = 
+                        '<div class="status-box error"><h3>❌ Сервер не отвечает</h3><p>Запустите сервер с помощью start_time_tracker.bat</p></div>';
+                });
+        }
+
+        // Проверяем сервер при загрузке страницы
+        window.onload = function() {
+            setTimeout(checkServer, 1000);
+        };
+    </script>
+</body>
+</html>
+
