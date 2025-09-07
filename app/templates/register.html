@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title or "Регистрация" }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/styles.css') }}" />
+  </head>
+  <body>
+    <header>
+      <h1>Регистрация</h1>
+    </header>
+    <main>
+      {% if error %}
+      <p style="color:#ffa8a8;">{{ error }}</p>
+      {% endif %}
+      {% if success %}
+      <p style="color:#9cffad;">Регистрация прошла успешно. Теперь вы можете войти.</p>
+      {% endif %}
+
+      <form method="post" action="/register">
+        <div style="display:grid;grid-template-columns:1fr;gap:12px;max-width:480px;">
+          <label>
+            Почта
+            <input type="email" name="email" placeholder="you@example.com" required />
+          </label>
+          <label>
+            Пароль
+            <input type="password" name="password" minlength="6" required />
+          </label>
+          <label>
+            ФИО
+            <input type="text" name="full_name" />
+          </label>
+          <label>
+            Дата рождения
+            <input type="date" name="date_of_birth" />
+          </label>
+          <label>
+            Роль
+            <select name="role" id="roleSelect" onchange="toggleAdminSecret()">
+              <option value="employee">Сотрудник</option>
+              <option value="admin">Администратор</option>
+            </select>
+          </label>
+          <label id="adminSecretBlock" style="display:none">
+            Секретный код для администратора
+            <input type="password" name="admin_secret" placeholder="Введите 20252025" />
+          </label>
+          <div>
+            <button type="submit">Зарегистрироваться</button>
+          </div>
+        </div>
+      </form>
+      <script>
+        function toggleAdminSecret(){
+          var role = document.getElementById('roleSelect').value;
+          var block = document.getElementById('adminSecretBlock');
+          block.style.display = role === 'admin' ? 'block' : 'none';
+        }
+        toggleAdminSecret();
+      </script>
+    </main>
+  </body>
+  </html>
+

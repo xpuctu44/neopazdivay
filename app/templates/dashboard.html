@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title or "Dashboard" }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/styles.css') }}" />
+  </head>
+  <body>
+    <header>
+      <h1>Личный кабинет</h1>
+    </header>
+    <main>
+      {% if not user %}
+        <p>Вы не авторизованы. <a href="/login">Войти</a></p>
+      {% else %}
+        <p>Здравствуйте, {{ user.full_name or user.email }} (роль: {{ user.role }})</p>
+
+        {% if user.role == 'employee' %}
+          <form method="post" action="{{ '/attendance/stop' if is_active else '/attendance/start' }}">
+            <button type="submit">{{ 'Я ушел' if is_active else 'Я пришел' }}</button>
+          </form>
+          {% if start_time %}
+            <p style="color:#98a2b3">Начало: {{ start_time }}</p>
+          {% endif %}
+        {% else %}
+          <p>Здесь будет панель администратора.</p>
+        {% endif %}
+
+        <form method="post" action="/logout" style="margin-top:16px;">
+          <button type="submit" class="btn" style="background:#eee">Выйти</button>
+        </form>
+      {% endif %}
+    </main>
+  </body>
+  </html>
