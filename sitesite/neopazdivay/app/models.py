@@ -1,6 +1,6 @@
-from datetime import datetime, date
+from datetime import datetime, date, time
 
-from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, Text, Time
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -39,11 +39,16 @@ class ScheduleEntry(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     work_date = Column(Date, nullable=False)
-    shift_type = Column(String(20), nullable=False)  # work, off, vacation, sick, weekend
+    start_time = Column(Time, nullable=True)
+    end_time = Column(Time, nullable=True)
+    store_id = Column(Integer, ForeignKey("stores.id", ondelete="SET NULL"), nullable=True)
+    notes = Column(Text, nullable=True)
+    shift_type = Column(String(20), nullable=False, default="work")  # work, off, vacation, sick, weekend
     published = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    
+
     user = relationship("User")
+    store = relationship("Store")
 
 
 class Store(Base):
@@ -52,6 +57,7 @@ class Store(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(200), unique=True, nullable=False, index=True)
     address = Column(Text, nullable=True)
+    phone = Column(String(20), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
 
     employees = relationship("User", back_populates="store")

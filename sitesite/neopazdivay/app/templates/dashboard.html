@@ -138,6 +138,17 @@
         background: #ffc107;
         color: #000;
       }
+      .timer-display {
+        font-family: 'Courier New', monospace;
+        font-weight: bold;
+        color: var(--accent);
+        background: rgba(90, 156, 254, 0.1);
+        padding: 5px 10px;
+        border-radius: 5px;
+        display: inline-block;
+        min-width: 80px;
+        text-align: center;
+      }
     </style>
   </head>
   <body>
@@ -179,6 +190,32 @@
               {% endif %}
             </div>
           {% else %}
+            <!-- Админская секция учета времени -->
+            <div class="attendance-section">
+              <h3>⏰ Учет рабочего времени администратора</h3>
+              <form method="post" action="{{ '/attendance/stop' if is_active else '/attendance/start' }}">
+                <button type="submit" class="attendance-button {{ 'stop' if is_active else '' }}">
+                  {{ '🕐 Я ушел' if is_active else '🕐 Я пришел' }}
+                </button>
+              </form>
+              {% if start_time %}
+                <div class="time-info">
+                  Начало работы: {{ start_time.strftime('%H:%M') }}
+                  <div id="work-timer" style="font-size: 1.2em; font-weight: bold; color: var(--accent); margin-top: 10px;">
+                    ⏱️ Текущее время работы: <span id="timer-display" class="timer-display">00:00:00</span>
+                  </div>
+                  <div style="margin-top: 10px; font-size: 0.9em; color: var(--muted);">
+                    💼 Статус: <strong style="color: #28a745;">На работе</strong>
+                  </div>
+                </div>
+              {% else %}
+                <div class="time-info">
+                  📅 Готов к началу работы
+                  <br>💼 Статус: <strong style="color: #6c757d;">Не на работе</strong>
+                </div>
+              {% endif %}
+            </div>
+
             <div class="admin-panel">
               <h3 class="admin-title">⚙️ Панель администратора</h3>
               <div class="admin-grid">
@@ -202,6 +239,14 @@
                   <span class="admin-icon">📋</span>
                   <a href="/admin/schedule">Просмотр графика</a>
                 </div>
+                <div class="admin-card">
+                  <span class="admin-icon">👥</span>
+                  <a href="/admin/employees">Управление сотрудниками</a>
+                </div>
+                <div class="admin-card">
+                  <span class="admin-icon">📋</span>
+                  <a href="/admin/scheduling-table">Таблица планирования</a>
+                </div>
               </div>
             </div>
           {% endif %}
@@ -216,5 +261,83 @@
         {% endif %}
       </div>
     </main>
+
+    <script>
+      // Timer functionality for work time tracking
+      document.addEventListener('DOMContentLoaded', function() {
+        const timerDisplay = document.getElementById('timer-display');
+        const workTimer = document.getElementById('work-timer');
+
+        if (timerDisplay && workTimer) {
+          // Get start time from server (passed from template)
+          const startTimeStr = '{{ start_time.isoformat() if start_time else "" }}';
+
+          if (startTimeStr) {
+            const startTime = new Date(startTimeStr + 'Z'); // Add Z for UTC
+            const now = new Date();
+
+            // Calculate initial elapsed time
+            let elapsedSeconds = Math.floor((now - startTime) / 1000);
+
+            // Update timer every second
+            setInterval(() => {
+              elapsedSeconds++;
+
+              const hours = Math.floor(elapsedSeconds / 3600);
+              const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+              const seconds = elapsedSeconds % 60;
+
+              const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+              timerDisplay.textContent = timeString;
+            }, 1000);
+
+            // Initial display
+            const hours = Math.floor(elapsedSeconds / 3600);
+            const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+            const seconds = elapsedSeconds % 60;
+            const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            timerDisplay.textContent = timeString;
+          }
+        }
+
+        // Add visual feedback for attendance button
+        const attendanceButton = document.querySelector('.attendance-button');
+        if (attendanceButton) {
+          attendanceButton.addEventListener('click', function() {
+            this.style.transform = 'scale(0.95)';
+            this.textContent = '⏳ Обработка...';
+
+            // Reset after a short delay
+            setTimeout(() => {
+              this.style.transform = '';
+            }, 200);
+          });
+        }
+
+        // Add confirmation for logout
+        const logoutButton = document.querySelector('.logout-button');
+        if (logoutButton) {
+          logoutButton.addEventListener('click', function(e) {
+            const isActive = '{{ "true" if is_active else "false" }}' === 'true';
+            if (isActive) {
+              const confirmLogout = confirm('⚠️ У вас активная смена! Вы уверены, что хотите выйти из системы?');
+              if (!confirmLogout) {
+                e.preventDefault();
+                return false;
+              }
+            }
+          });
+        }
+      });
+
+      // Auto-refresh timer every minute to stay in sync
+      setInterval(() => {
+        const timerDisplay = document.getElementById('timer-display');
+        if (timerDisplay && timerDisplay.textContent !== '00:00:00') {
+          // Timer is running, keep it updated
+          console.log('Timer active:', timerDisplay.textContent);
+        }
+      }, 60000);
+    </script>
   </body>
 </html>

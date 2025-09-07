@@ -83,4 +83,39 @@ def run_sqlite_migrations(engine: Engine) -> None:
                 text("ALTER TABLE users ADD COLUMN store_id INTEGER NULL REFERENCES stores(id)")
             )
 
+    # schedule_entries.start_time column
+    if not _column_exists(engine, "schedule_entries", "start_time"):
+        with engine.connect() as connection:
+            connection.execute(
+                text("ALTER TABLE schedule_entries ADD COLUMN start_time TIME NULL")
+            )
+
+    # schedule_entries.end_time column
+    if not _column_exists(engine, "schedule_entries", "end_time"):
+        with engine.connect() as connection:
+            connection.execute(
+                text("ALTER TABLE schedule_entries ADD COLUMN end_time TIME NULL")
+            )
+
+    # schedule_entries.store_id column
+    if not _column_exists(engine, "schedule_entries", "store_id"):
+        with engine.connect() as connection:
+            connection.execute(
+                text("ALTER TABLE schedule_entries ADD COLUMN store_id INTEGER NULL REFERENCES stores(id)")
+            )
+
+    # schedule_entries.notes column
+    if not _column_exists(engine, "schedule_entries", "notes"):
+        with engine.connect() as connection:
+            connection.execute(
+                text("ALTER TABLE schedule_entries ADD COLUMN notes TEXT NULL")
+            )
+
+    # stores.phone column
+    if not _column_exists(engine, "stores", "phone"):
+        with engine.connect() as connection:
+            connection.execute(
+                text("ALTER TABLE stores ADD COLUMN phone VARCHAR(20) NULL")
+            )
+
 
