@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Attendance, User, AllowedIP
+from app.models import Attendance, User, AllowedIP, ScheduleEntry
 
 
 router = APIRouter()
@@ -80,6 +80,64 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
         .filter(Attendance.user_id == user.id, Attendance.ended_at.is_(None))
         .first()
     )
+
+    # Get current month schedule for employees
+    employee_schedule = []
+    calendar_data = []
+    if user.role == "employee":
+        now = _get_moscow_time()
+        current_year = now.year
+        current_month = now.month
+
+        # Calculate first and last day of current month
+        from calendar import monthrange, monthcalendar
+        first_day = date(current_year, current_month, 1)
+        last_day_of_month = monthrange(current_year, current_month)[1]
+        last_day = date(current_year, current_month, last_day_of_month)
+
+        # Get published schedule entries for the current month
+        employee_schedule = (
+            db.query(ScheduleEntry)
+            .filter(
+                ScheduleEntry.user_id == user.id,
+                ScheduleEntry.work_date >= first_day,
+                ScheduleEntry.work_date <= last_day,
+                ScheduleEntry.published == True
+            )
+            .order_by(ScheduleEntry.work_date)
+            .all()
+        )
+
+        # Create calendar data structure
+        import calendar
+        cal = monthcalendar(current_year, current_month)
+
+        # Russian day names
+        russian_days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+
+        # Create schedule dictionary for quick lookup
+        schedule_dict = {entry.work_date: entry for entry in employee_schedule}
+
+        # Build calendar weeks
+        calendar_data = []
+        for week in cal:
+            week_data = []
+            for day in week:
+                if day == 0:
+                    # Empty cell for days not in this month
+                    week_data.append({'day': '', 'schedule': None, 'is_empty': True})
+                else:
+                    day_date = date(current_year, current_month, day)
+                    schedule_entry = schedule_dict.get(day_date)
+                    week_data.append({
+                        'day': day,
+                        'date': day_date,
+                        'schedule': schedule_entry,
+                        'is_empty': False,
+                        'is_today': day_date == now.date()
+                    })
+            calendar_data.append(week_data)
+
     return templates.TemplateResponse(
         "dashboard.html",
         {
@@ -88,6 +146,9 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
             "user": user,
             "is_active": bool(active),
             "start_time": active.started_at if active else None,
+            "employee_schedule": employee_schedule,
+            "calendar_data": calendar_data,
+            "russian_days": ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] if user.role == "employee" else [],
         },
     )
 
