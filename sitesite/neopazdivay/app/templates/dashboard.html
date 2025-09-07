@@ -221,6 +221,17 @@
               {% if start_time %}
                 <div class="time-info">
                   Начало работы: {{ start_time.strftime('%H:%M') }}
+                  <div id="work-timer-employee" style="font-size: 1.2em; font-weight: bold; color: var(--accent); margin-top: 10px;">
+                    ⏱️ Текущее время работы: <span id="timer-display-employee" class="timer-display">00:00:00</span>
+                  </div>
+                  <div style="margin-top: 10px; font-size: 0.9em; color: var(--muted);">
+                    💼 Статус: <strong style="color: #28a745;">На работе</strong>
+                  </div>
+                </div>
+              {% else %}
+                <div class="time-info">
+                  📅 Готов к началу работы
+                  <br>💼 Статус: <strong style="color: #6c757d;">Не на работе</strong>
                 </div>
               {% endif %}
             </div>
@@ -364,6 +375,7 @@
     <script>
       // Timer functionality for work time tracking
       document.addEventListener('DOMContentLoaded', function() {
+        // Admin timer
         const timerDisplay = document.getElementById('timer-display');
         const workTimer = document.getElementById('work-timer');
 
@@ -396,6 +408,42 @@
             const seconds = elapsedSeconds % 60;
             const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             timerDisplay.textContent = timeString;
+          }
+        }
+
+        // Employee timer
+        const timerDisplayEmployee = document.getElementById('timer-display-employee');
+        const workTimerEmployee = document.getElementById('work-timer-employee');
+
+        if (timerDisplayEmployee && workTimerEmployee) {
+          // Get start time from server (passed from template)
+          const startTimeStr = '{{ start_time.isoformat() if start_time else "" }}';
+
+          if (startTimeStr) {
+            const startTime = new Date(startTimeStr); // Time is already in correct timezone
+            const now = new Date();
+
+            // Calculate initial elapsed time
+            let elapsedSeconds = Math.floor((now - startTime) / 1000);
+
+            // Update timer every second
+            setInterval(() => {
+              elapsedSeconds++;
+
+              const hours = Math.floor(elapsedSeconds / 3600);
+              const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+              const seconds = elapsedSeconds % 60;
+
+              const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+              timerDisplayEmployee.textContent = timeString;
+            }, 1000);
+
+            // Initial display
+            const hours = Math.floor(elapsedSeconds / 3600);
+            const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+            const seconds = elapsedSeconds % 60;
+            const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            timerDisplayEmployee.textContent = timeString;
           }
         }
 
@@ -432,9 +480,16 @@
       // Auto-refresh timer every minute to stay in sync
       setInterval(() => {
         const timerDisplay = document.getElementById('timer-display');
+        const timerDisplayEmployee = document.getElementById('timer-display-employee');
+
         if (timerDisplay && timerDisplay.textContent !== '00:00:00') {
-          // Timer is running, keep it updated
-          console.log('Timer active:', timerDisplay.textContent);
+          // Admin timer is running, keep it updated
+          console.log('Admin timer active:', timerDisplay.textContent);
+        }
+
+        if (timerDisplayEmployee && timerDisplayEmployee.textContent !== '00:00:00') {
+          // Employee timer is running, keep it updated
+          console.log('Employee timer active:', timerDisplayEmployee.textContent);
         }
       }, 60000);
     </script>

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User
-from app.security import hash_password
+from app.security import create_refresh_token, hash_password, verify_password
 
 
 router = APIRouter()
@@ -100,6 +100,7 @@ def login(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
+    remember_me: str = Form(None),
     db: Session = Depends(get_db),
 ):
     user = db.query(User).filter(User.email == email).first()
@@ -109,9 +110,6 @@ def login(
             {"request": request, "title": "Вход", "error": "Неверная почта или пароль"},
             status_code=status.HTTP_400_BAD_REQUEST,
         )
-    # Password verification is optional for now since we do not import verify
-    # For correctness, use security.verify_password
-    from app.security import verify_password
 
     if not verify_password(password, user.password_hash):
         return templates.TemplateResponse(
@@ -122,7 +120,22 @@ def login(
 
     request.session["user_id"] = user.id
     request.session["role"] = user.role
-    return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+
+    response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+
+    # If remember_me is checked, set refresh token cookie
+    if remember_me:
+        refresh_token = create_refresh_token({"sub": str(user.id), "email": user.email})
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=True,
+            secure=False,  # Set to True in production with HTTPS
+            samesite="lax",
+            max_age=60 * 60 * 24 * 7  # 7 days
+        )
+
+    return response
 
 
 @router.post("/logout", include_in_schema=False)

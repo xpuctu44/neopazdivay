@@ -2,7 +2,15 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 
+def _table_exists(engine: Engine, table: str) -> bool:
+    with engine.connect() as connection:
+        result = connection.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name=:table"), {"table": table})
+        return result.fetchone() is not None
+
+
 def _column_exists(engine: Engine, table: str, column: str) -> bool:
+    if not _table_exists(engine, table):
+        return False
     with engine.connect() as connection:
         result = connection.execute(text(f"PRAGMA table_info('{table}')"))
         rows = result.mappings().all()
@@ -133,6 +141,20 @@ def run_sqlite_migrations(engine: Engine) -> None:
         with engine.connect() as connection:
             connection.execute(
                 text("ALTER TABLE stores ADD COLUMN phone VARCHAR(20) NULL")
+            )
+
+    # users.web_username column
+    if not _column_exists(engine, "users", "web_username"):
+        with engine.connect() as connection:
+            connection.execute(
+                text("ALTER TABLE users ADD COLUMN web_username VARCHAR(100) NULL")
+            )
+
+    # users.web_password_plain column
+    if not _column_exists(engine, "users", "web_password_plain"):
+        with engine.connect() as connection:
+            connection.execute(
+                text("ALTER TABLE users ADD COLUMN web_password_plain VARCHAR(100) NULL")
             )
 
 

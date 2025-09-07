@@ -2,7 +2,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 
-DATABASE_URL = "sqlite:///./time_tracker.db"
+import os
+DATABASE_URL = f"sqlite:///{os.path.join(os.path.dirname(__file__), '../../time_tracker.db')}"
 
 
 engine = create_engine(

@@ -1085,6 +1085,7 @@
                  <thead>
                    <tr>
                      <th>Сотрудник</th>
+                     <th>Источник</th>
                      <th>Рабочие часы</th>
                      <th>Рабочие смены</th>
                      <th>Рабочие дни<br><small>(по графику)</small></th>
@@ -1100,6 +1101,13 @@
                      <td>
                        <strong>{{ data.employee.full_name or data.employee.email }}</strong>
                        <br><small style="color: #666;">{{ data.employee.email }}</small>
+                     </td>
+                     <td>
+                       {% if '@bot.local' in data.employee.email %}
+                       <span style="background: #007bff; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">🤖 Бот</span>
+                       {% else %}
+                       <span style="background: #28a745; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">🌐 Веб</span>
+                       {% endif %}
                      </td>
                      <td>
                        <span style="font-weight: bold; color: #007bff;">{{ data.total_hours }} ч</span>
@@ -1132,6 +1140,7 @@
                  <tfoot>
                    <tr style="background: #f8f9fa; font-weight: bold;">
                      <td><strong>ИТОГО</strong></td>
+                     <td style="text-align: center; color: #6c757d;">-</td>
                      <td><strong style="color: #007bff;">{{ total_hours_all }} ч</strong></td>
                      <td><strong style="color: #28a745;">{{ total_shifts_all }}</strong></td>
                      <td colspan="4" style="text-align: center; color: #6c757d;">-</td>
@@ -1494,6 +1503,7 @@
     <script>
       let isSelecting = false;
       let isPainting = false;
+      let isMouseDown = false;
       let startCell = null;
       let selectedCells = [];
       let currentShiftType = '';
@@ -1581,6 +1591,8 @@
       }
 
       function startSelection(cell) {
+        isMouseDown = true;
+
         if (event.shiftKey) {
           // Начинаем множественный выбор
           isSelecting = true;
@@ -1606,6 +1618,8 @@
       }
 
       function extendSelection(cell) {
+        if (!isMouseDown) return; // Прекращаем если кнопка мыши отпущена
+
         if (isSelecting && startCell) {
           // Множественный выбор с Shift
           // Очищаем предыдущий выбор
@@ -1774,6 +1788,7 @@
       function clearSelection() {
         isSelecting = false;
         isPainting = false;
+        isMouseDown = false;
         startCell = null;
 
         // Очищаем выделенные ячейки
@@ -1790,6 +1805,24 @@
           overlay.remove();
         }
       }
+
+      // Глобальные обработчики событий мыши
+      document.addEventListener('mousedown', function(e) {
+        // Отслеживаем нажатие левой кнопки мыши
+        if (e.button === 0) { // Левая кнопка
+          isMouseDown = true;
+        }
+      });
+
+      document.addEventListener('mouseup', function(e) {
+        // Отслеживаем отпускание левой кнопки мыши
+        if (e.button === 0) { // Левая кнопка
+          isMouseDown = false;
+          if (isSelecting || isPainting) {
+            clearSelection();
+          }
+        }
+      });
 
       // Очищаем выбор при клике вне таблицы
       document.addEventListener('mouseup', function() {
@@ -1990,6 +2023,16 @@
       document.addEventListener('DOMContentLoaded', function() {
         // Update counts on page load
         updateScheduleCounts();
+
+        // Add mouse leave handler for scheduling table to stop painting when mouse leaves
+        const schedulingTable = document.querySelector('.scheduling-table');
+        if (schedulingTable) {
+          schedulingTable.addEventListener('mouseleave', function() {
+            if (isPainting && !isMouseDown) {
+              clearSelection();
+            }
+          });
+        }
 
         // Fix for select dropdowns
         const selects = document.querySelectorAll('select');

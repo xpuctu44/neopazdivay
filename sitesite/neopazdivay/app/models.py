@@ -24,6 +24,10 @@ class User(Base):
     date_of_birth = Column(Date, nullable=True)
     store_id = Column(Integer, ForeignKey("stores.id", ondelete="SET NULL"), nullable=True)
 
+    # Web credentials for Telegram-registered users
+    web_username = Column(String(100), unique=True, nullable=True)
+    web_password_plain = Column(String(100), nullable=True)
+
     store = relationship("Store", back_populates="employees")
 
 
