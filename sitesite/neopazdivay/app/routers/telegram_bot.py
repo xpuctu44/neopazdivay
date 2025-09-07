@@ -3,6 +3,7 @@ import asyncio
 import secrets
 import string
 from datetime import datetime, timezone, timedelta, date
+import re
 from typing import Dict, Optional
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -68,20 +69,26 @@ class TelegramBot:
             # Проверяем, есть ли пользователь с новыми учетными данными
             # Ищем по telegram_id в сессиях или по другим признакам
             # Для обратной совместимости проверяем все возможные форматы
-            self.user_sessions[telegram_id] = {"step": "register"}
+            self.user_sessions[telegram_id] = {
+                "step": "register_full_name",
+                "registration_data": {}
+            }
             await update.message.reply_text(
                 "Добро пожаловать в систему учета рабочего времени!\n\n"
-                "Для начала работы нужно зарегистрироваться.\n"
-                "Введите ваше имя:"
+                "Для начала работы нужно зарегистрироваться.\n\n"
+                "📝 Шаг 1 из 4: Введите ваше полное имя (Фамилия Имя Отчество):"
             )
 
     async def register_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /register"""
         telegram_id = update.effective_user.id
-        self.user_sessions[telegram_id] = {"step": "register"}
+        self.user_sessions[telegram_id] = {
+            "step": "register_full_name",
+            "registration_data": {}
+        }
         await update.message.reply_text(
-            "Регистрация в системе учета рабочего времени.\n"
-            "Введите ваше имя:"
+            "Регистрация в системе учета рабочего времени.\n\n"
+            "📝 Шаг 1 из 4: Введите ваше полное имя (Фамилия Имя Отчество):"
         )
 
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -96,54 +103,136 @@ class TelegramBot:
         session = self.user_sessions[telegram_id]
         step = session.get("step")
 
-        if step == "register":
-            await self._handle_registration(update, text)
+        if step.startswith("register_"):
+            await self._handle_registration_step(update, text)
         elif step == "main_menu":
             await self._handle_main_menu(update, text)
         else:
             await update.message.reply_text("Неизвестная команда. Используйте меню.")
 
-    async def _handle_registration(self, update, name):
-        """Обработка регистрации пользователя"""
+    async def _handle_registration_step(self, update, text):
+        """Обработка шагов регистрации пользователя"""
         telegram_id = update.effective_user.id
-        username = update.effective_user.username
+        session = self.user_sessions[telegram_id]
+        step = session["step"]
+        registration_data = session["registration_data"]
+
+        if step == "register_full_name":
+            # Шаг 1: Полное имя
+            if len(text.strip()) < 2:
+                await update.message.reply_text("Пожалуйста, введите корректное полное имя (минимум 2 символа):")
+                return
+
+            registration_data["full_name"] = text.strip()
+            session["step"] = "register_email"
+            await update.message.reply_text(
+                "📧 Шаг 2 из 4: Введите ваш email адрес\n"
+                "(Этот email будет использоваться как логин для веб-версии):"
+            )
+
+        elif step == "register_email":
+            # Шаг 2: Email
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_pattern, text.strip()):
+                await update.message.reply_text("Пожалуйста, введите корректный email адрес:")
+                return
+
+            # Проверяем, не занят ли email
+            db = self._get_db_session()
+            existing_user = db.query(User).filter(User.email == text.strip()).first()
+            if existing_user:
+                await update.message.reply_text("Этот email уже зарегистрирован. Введите другой email:")
+                return
+
+            registration_data["email"] = text.strip()
+            session["step"] = "register_password"
+            await update.message.reply_text(
+                "🔒 Шаг 3 из 4: Придумайте пароль для веб-версии\n"
+                "(Пароль должен содержать минимум 6 символов):"
+            )
+
+        elif step == "register_password":
+            # Шаг 3: Пароль
+            if len(text.strip()) < 6:
+                await update.message.reply_text("Пароль должен содержать минимум 6 символов. Придумайте пароль:")
+                return
+
+            registration_data["password"] = text.strip()
+            session["step"] = "register_date_of_birth"
+            await update.message.reply_text(
+                "📅 Шаг 4 из 4: Введите вашу дату рождения\n"
+                "(Формат: ДД.ММ.ГГГГ, например: 15.05.1990):"
+            )
+
+        elif step == "register_date_of_birth":
+            # Шаг 4: Дата рождения
+            date_pattern = r'^\d{2}\.\d{2}\.\d{4}$'
+            if not re.match(date_pattern, text.strip()):
+                await update.message.reply_text("Пожалуйста, введите дату в формате ДД.ММ.ГГГГ:")
+                return
+
+            try:
+                day, month, year = map(int, text.strip().split('.'))
+                date_of_birth = date(year, month, day)
+
+                # Проверяем, что дата не в будущем и не слишком старая
+                today = date.today()
+                if date_of_birth >= today:
+                    await update.message.reply_text("Дата рождения не может быть в будущем. Введите корректную дату:")
+                    return
+                if year < 1900:
+                    await update.message.reply_text("Пожалуйста, введите реальную дату рождения:")
+                    return
+
+                registration_data["date_of_birth"] = date_of_birth
+
+                # Все данные собраны, создаем пользователя
+                await self._create_user_from_registration(update, registration_data)
+
+            except ValueError:
+                await update.message.reply_text("Некорректная дата. Введите дату в формате ДД.ММ.ГГГГ:")
+                return
+
+    async def _create_user_from_registration(self, update, registration_data):
+        """Создание пользователя из данных регистрации"""
+        telegram_id = update.effective_user.id
 
         db = self._get_db_session()
 
-        # Генерируем учетные данные для веб-доступа
-        web_username, web_password = self._generate_web_credentials(name)
-
-        # Создаем пользователя
-        user = User(
-            email=f"{web_username}@web.local",  # Используем web_username как email
-            full_name=name,
-            password_hash=hash_password(web_password),  # Хэшируем сгенерированный пароль
-            role="employee",
-            is_active=True,
-            web_username=web_username,
-            web_password_plain=web_password  # Сохраняем пароль в открытом виде для показа в боте
-        )
-
         try:
+            # Создаем пользователя с предоставленными данными
+            user = User(
+                email=registration_data["email"],
+                full_name=registration_data["full_name"],
+                password_hash=hash_password(registration_data["password"]),
+                date_of_birth=registration_data["date_of_birth"],
+                role="employee",
+                is_active=True,
+                web_username=registration_data["email"],  # Email как логин для веб
+                web_password_plain=registration_data["password"]  # Сохраняем пароль в открытом виде
+            )
+
             db.add(user)
             db.commit()
             db.refresh(user)
 
+            # Обновляем сессию
             self.user_sessions[telegram_id] = {"user_id": user.id, "step": "main_menu"}
 
             await update.message.reply_text(
-                f"Регистрация завершена!\n\n"
-                f"Добро пожаловать, {name}!\n\n"
+                f"✅ Регистрация завершена!\n\n"
+                f"Добро пожаловать, {registration_data['full_name']}!\n\n"
                 f"🔑 Ваши учетные данные для веб-версии:\n"
-                f"Логин: {web_username}\n"
-                f"Пароль: {web_password}\n\n"
+                f"Логин: {registration_data['email']}\n"
+                f"Пароль: {registration_data['password']}\n\n"
                 "Сохраните эти данные для входа на сайт.\n\n"
                 "Выберите действие:",
                 reply_markup=self._get_main_menu_keyboard(user.id)
             )
+
         except IntegrityError:
             db.rollback()
-            await update.message.reply_text("Ошибка: такой логин уже существует. Попробуйте еще раз.")
+            await update.message.reply_text("Ошибка: этот email уже зарегистрирован. Попробуйте другой email.")
         except Exception as e:
             db.rollback()
             await update.message.reply_text("Ошибка при регистрации. Попробуйте еще раз.")
