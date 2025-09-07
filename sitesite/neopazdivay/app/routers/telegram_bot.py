@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db
-from app.models import User, Attendance, Store
+from app.models import User, Attendance, Store, AllowedIP
 from app.security import verify_password, hash_password
 
 
@@ -29,6 +29,59 @@ class TelegramBot:
     def _get_db_session(self) -> Session:
         """Получает сессию базы данных"""
         return next(get_db())
+
+    def _check_telegram_user_allowed(self, user_id: int) -> tuple[bool, str]:
+        """Проверяет, разрешен ли Telegram пользователь для отметки прихода/ухода
+
+        Returns:
+            tuple: (is_allowed: bool, message: str)
+        """
+        db = self._get_db_session()
+
+        # Получаем пользователя
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return False, "Пользователь не найден"
+
+        # Получаем список разрешенных IP
+        allowed_ips = db.query(AllowedIP).filter(AllowedIP.is_active == True).all()
+
+        # Если нет разрешенных IP вообще, разрешаем всем
+        if not allowed_ips:
+            return True, "IP проверка отключена (нет разрешенных IP)"
+
+        # Для Telegram пользователей мы не можем получить реальный IP адрес,
+        # поэтому проверяем альтернативные критерии:
+
+        # 1. Проверяем, есть ли у пользователя недавняя активность через веб-интерфейс
+        # (это косвенно указывает на то, что пользователь имеет доступ к разрешенной сети)
+        recent_attendance = db.query(Attendance).filter(
+            Attendance.user_id == user_id,
+            Attendance.started_at >= datetime.now() - timedelta(days=7)  # Последние 7 дней
+        ).first()
+
+        if recent_attendance:
+            return True, "Разрешено на основе недавней активности"
+
+        # 2. Проверяем, есть ли у пользователя опубликованный график на текущий месяц
+        # (это указывает на то, что пользователь является активным сотрудником)
+        current_month = date.today().replace(day=1)
+        next_month = (current_month + timedelta(days=32)).replace(day=1)
+
+        from app.models import ScheduleEntry
+        active_schedule = db.query(ScheduleEntry).filter(
+            ScheduleEntry.user_id == user_id,
+            ScheduleEntry.work_date >= current_month,
+            ScheduleEntry.work_date < next_month,
+            ScheduleEntry.published == True
+        ).first()
+
+        if active_schedule:
+            return True, "Разрешено для активного сотрудника с графиком"
+
+        # Если ни одного критерия не выполнено, но есть разрешенные IP,
+        # показываем предупреждение, но разрешаем действие с уведомлением
+        return True, "⚠️ Внимание: IP проверка активна, но для Telegram пользователей проверка ограничена. Рекомендуется использовать веб-интерфейс с разрешенного IP."
 
     def _generate_web_credentials(self, name: str) -> tuple[str, str]:
         """Генерирует логин и пароль для веб-доступа"""
@@ -56,7 +109,7 @@ class TelegramBot:
 
         # Проверяем, зарегистрирован ли пользователь
         db = self._get_db_session()
-        user = db.query(User).filter(User.email == f"telegram_{telegram_id}@bot.local").first()
+        user = db.query(User).filter(User.telegram_id == telegram_id).first()
 
         if user:
             self.user_sessions[telegram_id] = {"user_id": user.id, "step": "main_menu"}
@@ -208,6 +261,7 @@ class TelegramBot:
                 date_of_birth=registration_data["date_of_birth"],
                 role="employee",
                 is_active=True,
+                telegram_id=telegram_id,  # Сохраняем Telegram ID для связи
                 web_username=registration_data["email"],  # Email как логин для веб
                 web_password_plain=registration_data["password"]  # Сохраняем пароль в открытом виде
             )
@@ -259,6 +313,24 @@ class TelegramBot:
         if not user:
             await update.message.reply_text("Пользователь не найден")
             return
+
+        # Проверяем разрешение для отметки прихода
+        is_allowed, message = self._check_telegram_user_allowed(user_id)
+        if not is_allowed:
+            await update.message.reply_text(
+                f"❌ Доступ запрещен!\n\n{message}\n\n"
+                "Обратитесь к администратору для решения проблемы.\n\n"
+                "Выберите действие:",
+                reply_markup=self._get_main_menu_keyboard(user_id)
+            )
+            return
+
+        # Если есть предупреждение, показываем его
+        if "⚠️" in message:
+            await update.message.reply_text(
+                f"{message}\n\n"
+                "Продолжаем выполнение действия...\n"
+            )
 
         now = self._get_moscow_time()
         today = now.date()
@@ -317,6 +389,25 @@ class TelegramBot:
     async def _handle_checkout(self, update, user_id):
         """Обработка ухода с работы"""
         db = self._get_db_session()
+
+        # Проверяем разрешение для отметки ухода
+        is_allowed, message = self._check_telegram_user_allowed(user_id)
+        if not is_allowed:
+            await update.message.reply_text(
+                f"❌ Доступ запрещен!\n\n{message}\n\n"
+                "Обратитесь к администратору для решения проблемы.\n\n"
+                "Выберите действие:",
+                reply_markup=self._get_main_menu_keyboard(user_id)
+            )
+            return
+
+        # Если есть предупреждение, показываем его
+        if "⚠️" in message:
+            await update.message.reply_text(
+                f"{message}\n\n"
+                "Продолжаем выполнение действия...\n"
+            )
+
         now = self._get_moscow_time()
         today = now.date()
 
@@ -503,6 +594,27 @@ class TelegramBot:
             await query.edit_message_text("Пользователь не найден")
             return
 
+        # Проверяем разрешение для отметки прихода
+        is_allowed, message = self._check_telegram_user_allowed(user_id)
+        if not is_allowed:
+            await query.edit_message_text(
+                f"❌ Доступ запрещен!\n\n{message}\n\n"
+                "Обратитесь к администратору для решения проблемы.\n\n"
+                "Выберите действие:",
+                reply_markup=self._get_main_menu_keyboard(user_id)
+            )
+            return
+
+        # Если есть предупреждение, показываем его
+        if "⚠️" in message:
+            await query.edit_message_text(
+                f"{message}\n\n"
+                "Продолжаем выполнение действия...\n\n"
+                "Выберите действие:",
+                reply_markup=self._get_main_menu_keyboard(user_id)
+            )
+            return
+
         now = self._get_moscow_time()
         today = now.date()
 
@@ -575,6 +687,28 @@ class TelegramBot:
     async def _handle_checkout_via_callback(self, query, user_id):
         """Обработка ухода через callback"""
         db = self._get_db_session()
+
+        # Проверяем разрешение для отметки ухода
+        is_allowed, message = self._check_telegram_user_allowed(user_id)
+        if not is_allowed:
+            await query.edit_message_text(
+                f"❌ Доступ запрещен!\n\n{message}\n\n"
+                "Обратитесь к администратору для решения проблемы.\n\n"
+                "Выберите действие:",
+                reply_markup=self._get_main_menu_keyboard(user_id)
+            )
+            return
+
+        # Если есть предупреждение, показываем его
+        if "⚠️" in message:
+            await query.edit_message_text(
+                f"{message}\n\n"
+                "Продолжаем выполнение действия...\n\n"
+                "Выберите действие:",
+                reply_markup=self._get_main_menu_keyboard(user_id)
+            )
+            return
+
         now = self._get_moscow_time()
         today = now.date()
 

@@ -157,4 +157,14 @@ def run_sqlite_migrations(engine: Engine) -> None:
                 text("ALTER TABLE users ADD COLUMN web_password_plain VARCHAR(100) NULL")
             )
 
+    # users.telegram_id column
+    if not _column_exists(engine, "users", "telegram_id"):
+        with engine.connect() as connection:
+            connection.execute(
+                text("ALTER TABLE users ADD COLUMN telegram_id INTEGER NULL")
+            )
+            connection.execute(
+                text("CREATE UNIQUE INDEX ix_users_telegram_id ON users(telegram_id)")
+            )
+
 
