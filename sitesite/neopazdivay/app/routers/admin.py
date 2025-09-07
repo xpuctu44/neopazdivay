@@ -10,7 +10,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 from app.database import get_db
-from app.models import User, ScheduleEntry, Store, Attendance
+from app.models import User, ScheduleEntry, Store, Attendance, AllowedIP
 
 
 router = APIRouter()
@@ -566,6 +566,8 @@ def admin_reports(
     report_type: str = "month",
     start_date: str = None,
     end_date: str = None,
+    month: int = None,
+    year: int = None,
     db: Session = Depends(get_db)
 ):
     result = _ensure_admin(request, db)
@@ -577,12 +579,21 @@ def admin_reports(
         today = date.today()
 
         if report_type == "month":
-            # Текущий месяц
-            start_date_obj = date(today.year, today.month, 1)
-            if today.month == 12:
-                end_date_obj = date(today.year + 1, 1, 1) - timedelta(days=1)
+            # Выбранный месяц или текущий месяц
+            selected_month = month if month is not None else today.month
+            selected_year = year if year is not None else today.year
+
+            # Валидация параметров
+            if selected_month < 1 or selected_month > 12:
+                selected_month = today.month
+            if selected_year < 2020 or selected_year > 2030:
+                selected_year = today.year
+
+            start_date_obj = date(selected_year, selected_month, 1)
+            if selected_month == 12:
+                end_date_obj = date(selected_year + 1, 1, 1) - timedelta(days=1)
             else:
-                end_date_obj = date(today.year, today.month + 1, 1) - timedelta(days=1)
+                end_date_obj = date(selected_year, selected_month + 1, 1) - timedelta(days=1)
         elif report_type == "year":
             # Текущий год
             start_date_obj = date(today.year, 1, 1)
@@ -655,6 +666,29 @@ def admin_reports(
         total_hours_all = sum(data['total_hours'] for data in report_data)
         total_shifts_all = sum(data['working_shifts'] for data in report_data)
 
+        # Получаем списки месяцев и лет для селекторов
+        months = [
+            {"value": 1, "name": "Январь"},
+            {"value": 2, "name": "Февраль"},
+            {"value": 3, "name": "Март"},
+            {"value": 4, "name": "Апрель"},
+            {"value": 5, "name": "Май"},
+            {"value": 6, "name": "Июнь"},
+            {"value": 7, "name": "Июль"},
+            {"value": 8, "name": "Август"},
+            {"value": 9, "name": "Сентябрь"},
+            {"value": 10, "name": "Октябрь"},
+            {"value": 11, "name": "Ноябрь"},
+            {"value": 12, "name": "Декабрь"}
+        ]
+
+        current_year = date.today().year
+        years = [{"value": y, "name": str(y)} for y in range(current_year - 1, current_year + 3)]
+
+        # Определяем выбранные значения
+        selected_month = month if month is not None else today.month
+        selected_year = year if year is not None else today.year
+
     except Exception as e:
         print(f"Ошибка при получении отчетов: {e}")
         report_data = []
@@ -677,6 +711,10 @@ def admin_reports(
             "total_employees": total_employees,
             "total_hours_all": round(total_hours_all, 2),
             "total_shifts_all": total_shifts_all,
+            "months": months,
+            "years": years,
+            "selected_month": selected_month,
+            "selected_year": selected_year,
             "message": "Аналитика и отчеты по рабочему времени",
         },
     )
@@ -688,6 +726,8 @@ def export_reports(
     report_type: str = "month",
     start_date: str = None,
     end_date: str = None,
+    month: int = None,
+    year: int = None,
     db: Session = Depends(get_db)
 ):
     result = _ensure_admin(request, db)
@@ -699,11 +739,21 @@ def export_reports(
         today = date.today()
 
         if report_type == "month":
-            start_date_obj = date(today.year, today.month, 1)
-            if today.month == 12:
-                end_date_obj = date(today.year + 1, 1, 1) - timedelta(days=1)
+            # Выбранный месяц или текущий месяц
+            selected_month = month if month is not None else today.month
+            selected_year = year if year is not None else today.year
+
+            # Валидация параметров
+            if selected_month < 1 or selected_month > 12:
+                selected_month = today.month
+            if selected_year < 2020 or selected_year > 2030:
+                selected_year = today.year
+
+            start_date_obj = date(selected_year, selected_month, 1)
+            if selected_month == 12:
+                end_date_obj = date(selected_year + 1, 1, 1) - timedelta(days=1)
             else:
-                end_date_obj = date(today.year, today.month + 1, 1) - timedelta(days=1)
+                end_date_obj = date(selected_year, selected_month + 1, 1) - timedelta(days=1)
         elif report_type == "year":
             start_date_obj = date(today.year, 1, 1)
             end_date_obj = date(today.year, 12, 31)
@@ -1196,4 +1246,103 @@ def create_store(
         
     except Exception as e:
         print(f"Ошибка при создании магазина: {e}")
+@router.get("/admin/allowed-ips", include_in_schema=False)
+def admin_allowed_ips(request: Request, db: Session = Depends(get_db)):
+    result = _ensure_admin(request, db)
+    if isinstance(result, RedirectResponse):
+        return result
+
+    try:
+        # Получаем все разрешенные IP
+        allowed_ips = db.query(AllowedIP).order_by(AllowedIP.created_at.desc()).all()
+
+    except Exception as e:
+        print(f"Ошибка при получении разрешенных IP: {e}")
+        allowed_ips = []
+
+    return templates.TemplateResponse(
+        "admin.html",
+        {
+            "request": request,
+            "title": "Админ — Разрешенные IP",
+            "active_tab": "allowed_ips",
+            "allowed_ips": allowed_ips,
+            "message": "Управление списком разрешенных IP адресов",
+        },
+    )
+
+
+@router.post("/admin/allowed-ips/create", include_in_schema=False)
+def create_allowed_ip(
+    request: Request,
+    ip_address: str = Form(...),
+    description: str = Form(""),
+    db: Session = Depends(get_db)
+):
+    result = _ensure_admin(request, db)
+    if isinstance(result, RedirectResponse):
+        return result
+
+    try:
+        # Проверяем, что IP не существует
+        existing = db.query(AllowedIP).filter(AllowedIP.ip_address == ip_address).first()
+        if existing:
+            return RedirectResponse(url="/admin/allowed-ips?error=ip_exists", status_code=status.HTTP_303_SEE_OTHER)
+
+        # Получаем текущего пользователя
+        admin_user = _current_user(request, db)
+
+        # Создаем новый разрешенный IP
+        allowed_ip = AllowedIP(
+            ip_address=ip_address,
+            description=description,
+            created_by=admin_user.id if admin_user else None
+        )
+
+        db.add(allowed_ip)
+        db.commit()
+
+        return RedirectResponse(url="/admin/allowed-ips?success=created", status_code=status.HTTP_303_SEE_OTHER)
+
+    except Exception as e:
+        print(f"Ошибка при создании разрешенного IP: {e}")
+        return RedirectResponse(url="/admin/allowed-ips?error=server_error", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/admin/allowed-ips/delete/{ip_id}", include_in_schema=False)
+def delete_allowed_ip(ip_id: int, request: Request, db: Session = Depends(get_db)):
+    result = _ensure_admin(request, db)
+    if isinstance(result, RedirectResponse):
+        return result
+
+    try:
+        allowed_ip = db.query(AllowedIP).filter(AllowedIP.id == ip_id).first()
+        if allowed_ip:
+            db.delete(allowed_ip)
+            db.commit()
+
+        return RedirectResponse(url="/admin/allowed-ips?success=deleted", status_code=status.HTTP_303_SEE_OTHER)
+
+    except Exception as e:
+        print(f"Ошибка при удалении разрешенного IP: {e}")
+        return RedirectResponse(url="/admin/allowed-ips?error=delete_error", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/admin/allowed-ips/toggle/{ip_id}", include_in_schema=False)
+def toggle_allowed_ip_status(ip_id: int, request: Request, db: Session = Depends(get_db)):
+    result = _ensure_admin(request, db)
+    if isinstance(result, RedirectResponse):
+        return result
+
+    try:
+        allowed_ip = db.query(AllowedIP).filter(AllowedIP.id == ip_id).first()
+        if allowed_ip:
+            allowed_ip.is_active = not allowed_ip.is_active
+            db.commit()
+
+        return RedirectResponse(url="/admin/allowed-ips?success=status_changed", status_code=status.HTTP_303_SEE_OTHER)
+
+    except Exception as e:
+        print(f"Ошибка при изменении статуса IP: {e}")
+        return RedirectResponse(url="/admin/allowed-ips?error=status_error", status_code=status.HTTP_303_SEE_OTHER)
         return RedirectResponse(url="/admin/stores?error=server_error", status_code=status.HTTP_303_SEE_OTHER)

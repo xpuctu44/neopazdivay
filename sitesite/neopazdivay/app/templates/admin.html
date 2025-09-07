@@ -532,12 +532,12 @@
       <div class="nav">
         <a href="/admin" class="{{ 'active' if active_tab == 'dashboard' else '' }}">Главная</a>
         <a href="/admin/employees" class="{{ 'active' if active_tab == 'employees' else '' }}">Сотрудники</a>
-        <a href="/admin/planning" class="{{ 'active' if active_tab == 'planning' else '' }}">Планирование</a>
         <a href="/admin/scheduling-table" class="{{ 'active' if active_tab == 'scheduling_table' else '' }}">Таблица планирования</a>
         <a href="/admin/schedule" class="{{ 'active' if active_tab == 'schedule' else '' }}">График</a>
         <a href="/admin/attendance" class="{{ 'active' if active_tab == 'attendance' else '' }}">Редактирование присутствия</a>
         <a href="/admin/reports" class="{{ 'active' if active_tab == 'reports' else '' }}">Отчеты</a>
         <a href="/admin/stores" class="{{ 'active' if active_tab == 'stores' else '' }}">Магазины</a>
+        <a href="/admin/allowed-ips" class="{{ 'active' if active_tab == 'allowed_ips' else '' }}">Разрешенные IP</a>
       </div>
 
       <div class="content">
@@ -666,104 +666,6 @@
           <p>Нет зарегистрированных сотрудников.</p>
           {% endif %}
 
-        {% elif active_tab == 'planning' %}
-          <h3>📅 Планирование смен</h3>
-          {% if message %}<p>{{ message }}</p>{% endif %}
-
-          <!-- Форма создания смены -->
-          <div class="form-section">
-            <h4>Создать новую смену</h4>
-            <form method="post" action="/admin/planning/create">
-              <div class="form-group">
-                <label for="employee_id">Сотрудник:</label>
-                <select id="employee_id" name="employee_id" required>
-                  <option value="">Выберите сотрудника</option>
-                  {% for employee in employees %}
-                  <option value="{{ employee.id }}">
-                    {{ employee.full_name or employee.email }}
-                    ({{ "Администратор" if employee.role == "admin" else "Сотрудник" }})
-                  </option>
-                  {% endfor %}
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label for="work_date">Дата работы:</label>
-                <input type="date" id="work_date" name="work_date" required>
-              </div>
-
-              <div class="form-group">
-                <label for="start_time">Время начала:</label>
-                <input type="time" id="start_time" name="start_time" required>
-              </div>
-
-              <div class="form-group">
-                <label for="end_time">Время окончания:</label>
-                <input type="time" id="end_time" name="end_time" required>
-              </div>
-
-              <div class="form-group">
-                <label for="store_id">Магазин (опционально):</label>
-                <select id="store_id" name="store_id">
-                  <option value="">Без привязки к магазину</option>
-                  {% for store in stores %}
-                  <option value="{{ store.id }}">{{ store.name }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label for="notes">Примечания:</label>
-                <textarea id="notes" name="notes" placeholder="Дополнительная информация о смене"></textarea>
-              </div>
-
-              <button type="submit" class="btn btn-primary">Создать смену</button>
-            </form>
-          </div>
-
-          <!-- Список текущих смен -->
-          {% if current_schedules %}
-          <div class="form-section">
-            <h4>Текущие смены</h4>
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Сотрудник</th>
-                  <th>Дата</th>
-                  <th>Время</th>
-                  <th>Магазин</th>
-                  <th>Примечания</th>
-                  <th>Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for schedule in current_schedules %}
-                <tr>
-                  <td>
-                    {{ schedule.user.full_name or schedule.user.email }}
-                    <br><small style="color: #666;">({{ "Администратор" if schedule.user.role == "admin" else "Сотрудник" }})</small>
-                  </td>
-                  <td>{{ schedule.work_date.strftime('%d.%m.%Y') }}</td>
-                  <td>
-                    {% if schedule.start_time and schedule.end_time %}
-                      {{ schedule.start_time.strftime('%H:%M') }} - {{ schedule.end_time.strftime('%H:%M') }}
-                    {% else %}
-                      -
-                    {% endif %}
-                  </td>
-                  <td>{{ schedule.store.name if schedule.store else 'Не указан' }}</td>
-                  <td>{{ schedule.notes or '-' }}</td>
-                  <td>
-                    <form method="post" action="/admin/planning/delete/{{ schedule.id }}" style="display: inline;">
-                      <button type="submit" class="btn btn-danger" onclick="return confirm('Удалить смену?')">Удалить</button>
-                    </form>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          {% endif %}
 
         {% elif active_tab == 'scheduling_table' %}
           <h3>📋 Таблица планирования</h3>
@@ -1097,6 +999,44 @@
                </button>
              </div>
 
+             <!-- Month/Year Selector for Monthly Reports -->
+             {% if report_type == 'month' %}
+             <div class="month-selector" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6;">
+               <h5 style="margin: 0 0 15px 0; color: #333;">Выберите месяц и год для отчета</h5>
+               <form method="get" action="/admin/reports" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                 <input type="hidden" name="report_type" value="month">
+                 <div>
+                   <label for="month" style="display: block; margin-bottom: 5px; font-weight: bold; color: #333;">Месяц:</label>
+                   <select name="month" id="month" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9em; min-width: 140px;">
+                     {% for month_option in months %}
+                     <option value="{{ month_option.value }}" {{ 'selected' if month_option.value == selected_month else '' }}>
+                       {{ month_option.name }}
+                     </option>
+                     {% endfor %}
+                   </select>
+                 </div>
+                 <div>
+                   <label for="year" style="display: block; margin-bottom: 5px; font-weight: bold; color: #333;">Год:</label>
+                   <select name="year" id="year" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9em; min-width: 100px;">
+                     {% for year_option in years %}
+                     <option value="{{ year_option.value }}" {{ 'selected' if year_option.value == selected_year else '' }}>
+                       {{ year_option.name }}
+                     </option>
+                     {% endfor %}
+                   </select>
+                 </div>
+                 <div style="align-self: flex-end;">
+                   <button type="submit" class="btn btn-success" style="padding: 8px 20px; font-size: 0.9em;">
+                     📊 Показать отчет
+                   </button>
+                 </div>
+               </form>
+               <div style="margin-top: 10px; font-size: 0.85em; color: #666;">
+                 📅 <strong>Текущий выбор:</strong> {{ months[selected_month-1].name if selected_month else 'Текущий месяц' }} {{ selected_year if selected_year else 'текущий год' }}
+               </div>
+             </div>
+             {% endif %}
+
              <!-- Custom Date Picker (hidden by default) -->
              <div id="custom-date-picker" class="custom-date-picker {{ 'visible' if report_type == 'custom' else 'hidden' }}">
                <h5>Выберите даты</h5>
@@ -1135,7 +1075,7 @@
            <div class="form-section">
              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                <h4 style="margin: 0;">Детальный отчет по сотрудникам</h4>
-               <a href="/admin/reports/export?report_type={{ report_type }}&start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-success">
+               <a href="/admin/reports/export?report_type={{ report_type }}&start_date={{ start_date }}&end_date={{ end_date }}{% if report_type == 'month' %}&month={{ selected_month }}&year={{ selected_year }}{% endif %}" class="btn btn-success">
                  📥 Скачать Excel
                </a>
              </div>
@@ -1423,7 +1363,127 @@
           </div>
           {% endif %}
 
-       {% else %}
+        {% elif active_tab == 'allowed_ips' %}
+          <h3>🔒 Управление разрешенными IP адресами</h3>
+          {% if message %}<p>{{ message }}</p>{% endif %}
+
+          <!-- Уведомления об успешных операциях -->
+          {% if request.query_params.get('success') == 'created' %}
+          <div class="alert alert-success">
+            ✅ IP адрес успешно добавлен!
+          </div>
+          {% elif request.query_params.get('success') == 'deleted' %}
+          <div class="alert alert-success">
+            ✅ IP адрес успешно удален!
+          </div>
+          {% elif request.query_params.get('success') == 'status_changed' %}
+          <div class="alert alert-success">
+            ✅ Статус IP адреса успешно изменен!
+          </div>
+          {% elif request.query_params.get('error') == 'ip_exists' %}
+          <div class="alert alert-danger">
+            ❌ Этот IP адрес уже существует!
+          </div>
+          {% elif request.query_params.get('error') == 'ip_exists' %}
+          <div class="alert alert-danger">
+            ❌ Этот IP адрес уже существует!
+          </div>
+          {% elif request.query_params.get('error') == 'server_error' %}
+          <div class="alert alert-danger">
+            ❌ Произошла ошибка сервера!
+          </div>
+          {% elif request.query_params.get('error') == 'delete_error' %}
+          <div class="alert alert-danger">
+            ❌ Ошибка при удалении IP адреса!
+          </div>
+          {% elif request.query_params.get('error') == 'status_error' %}
+          <div class="alert alert-danger">
+            ❌ Ошибка при изменении статуса IP адреса!
+          </div>
+          {% endif %}
+
+          <!-- Форма добавления нового IP -->
+          <div class="form-section">
+            <h4>Добавить новый разрешенный IP адрес</h4>
+            <form method="post" action="/admin/allowed-ips/create">
+              <div class="form-group">
+                <label for="ip_address">IP адрес:</label>
+                <input type="text" id="ip_address" name="ip_address" required
+                       placeholder="192.168.1.1 или 2001:db8::1" pattern="^(\d{1,3}\.){3}\d{1,3}$|^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$"
+                       title="Введите корректный IPv4 или IPv6 адрес">
+              </div>
+
+              <div class="form-group">
+                <label for="description">Описание (опционально):</label>
+                <input type="text" id="description" name="description" placeholder="Например: Офисная сеть">
+              </div>
+
+              <button type="submit" class="btn btn-primary">➕ Добавить IP адрес</button>
+            </form>
+          </div>
+
+          <!-- Список разрешенных IP -->
+          {% if allowed_ips %}
+          <div class="form-section">
+            <h4>Список разрешенных IP адресов</h4>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>IP адрес</th>
+                  <th>Описание</th>
+                  <th>Статус</th>
+                  <th>Дата создания</th>
+                  <th>Создал</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for ip in allowed_ips %}
+                <tr>
+                  <td>
+                    <code style="background: #f8f9fa; padding: 2px 6px; border-radius: 3px; font-family: monospace;">
+                      {{ ip.ip_address }}
+                    </code>
+                  </td>
+                  <td>{{ ip.description or 'Без описания' }}</td>
+                  <td>
+                    <span class="btn {{ 'btn-success' if ip.is_active else 'btn-danger' }}" style="padding: 3px 8px; font-size: 0.8em;">
+                      {{ 'Активен' if ip.is_active else 'Неактивен' }}
+                    </span>
+                  </td>
+                  <td>{{ ip.created_at.strftime('%d.%m.%Y %H:%M') if ip.created_at else 'Неизвестно' }}</td>
+                  <td>{{ ip.creator.full_name if ip.creator else 'Система' }}</td>
+                  <td>
+                    <!-- Кнопка изменения статуса -->
+                    <form method="post" action="/admin/allowed-ips/toggle/{{ ip.id }}" style="display: inline-block; margin-right: 5px;">
+                      <button type="submit" class="btn {{ 'btn-warning' if ip.is_active else 'btn-success' }}"
+                              style="padding: 3px 8px; font-size: 0.8em;">
+                        {{ 'Деактивировать' if ip.is_active else 'Активировать' }}
+                      </button>
+                    </form>
+
+                    <!-- Кнопка удаления -->
+                    <form method="post" action="/admin/allowed-ips/delete/{{ ip.id }}" style="display: inline-block;">
+                      <button type="submit" class="btn btn-danger" style="padding: 3px 8px; font-size: 0.8em;">
+                        🗑️ Удалить
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div style="text-align: center; padding: 40px; background: #f8f9fa; border-radius: 8px;">
+            <h4 style="color: #6c757d; margin-bottom: 15px;">📭 Нет разрешенных IP адресов</h4>
+            <p style="color: #6c757d; margin: 0;">
+              Добавьте первый IP адрес с помощью формы выше
+            </p>
+          </div>
+          {% endif %}
+
+        {% else %}
           <h3>Добро пожаловать в админ панель!</h3>
           {% if message %}<p>{{ message }}</p>{% endif %}
           <p>Выберите раздел в навигации выше.</p>

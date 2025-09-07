@@ -111,6 +111,23 @@ def run_sqlite_migrations(engine: Engine) -> None:
                 text("ALTER TABLE schedule_entries ADD COLUMN notes TEXT NULL")
             )
 
+    # allowed_ips table
+    with engine.connect() as connection:
+        exists = connection.execute(text("""
+            SELECT name FROM sqlite_master WHERE type='table' AND name='allowed_ips'
+        """)).fetchone()
+        if not exists:
+            connection.execute(text("""
+                CREATE TABLE allowed_ips (
+                    id INTEGER PRIMARY KEY,
+                    ip_address VARCHAR(45) NOT NULL UNIQUE,
+                    description VARCHAR(255) NULL,
+                    is_active BOOLEAN NOT NULL DEFAULT 1,
+                    created_at DATETIME NOT NULL,
+                    created_by INTEGER NULL REFERENCES users(id)
+                )
+            """))
+
     # stores.phone column
     if not _column_exists(engine, "stores", "phone"):
         with engine.connect() as connection:

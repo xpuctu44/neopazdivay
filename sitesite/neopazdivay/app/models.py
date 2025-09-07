@@ -1,9 +1,15 @@
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timezone, timedelta
 
 from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, Text, Time
 from sqlalchemy.orm import relationship
 
 from app.database import Base
+
+
+def _get_moscow_time():
+    """Получает текущее время в московском часовом поясе (UTC+3)"""
+    moscow_tz = timezone(timedelta(hours=3))
+    return datetime.now(moscow_tz)
 
 
 class User(Base):
@@ -45,7 +51,7 @@ class ScheduleEntry(Base):
     notes = Column(Text, nullable=True)
     shift_type = Column(String(20), nullable=False, default="work")  # work, off, vacation, sick, weekend
     published = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_get_moscow_time, nullable=False)
 
     user = relationship("User")
     store = relationship("Store")
@@ -61,4 +67,17 @@ class Store(Base):
     is_active = Column(Boolean, default=True, nullable=False)
 
     employees = relationship("User", back_populates="store")
+
+
+class AllowedIP(Base):
+    __tablename__ = "allowed_ips"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ip_address = Column(String(45), unique=True, nullable=False, index=True)  # IPv4 and IPv6 support
+    description = Column(String(255), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=_get_moscow_time, nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    creator = relationship("User")
 
